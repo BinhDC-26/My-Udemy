@@ -1,0 +1,4 @@
+
+Time: 2/22/2024 6:17:49 PM, Controller: UserInfo, Action: Create, Exception: Value cannot be null. (Parameter 'model')
+Time: 2/22/2024 6:19:14 PM, Controller: UserInfo, Action: Create, Exception: Value cannot be null. (Parameter 'model')
+Time: 2024/02/26 18:04:04, Controller: Customer, Action: Insert, Exception: Could not save changes. Please configure your entity type accordingly.
