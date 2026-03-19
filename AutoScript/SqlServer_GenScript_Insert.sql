@@ -4,41 +4,56 @@ DECLARE @insert NVARCHAR(MAX) = 'INSERT INTO ' + @table_name + ' (';
 DECLARE @select NVARCHAR(MAX) = 'SELECT ';
 
 SELECT 
-    @insert = @insert + QUOTENAME(c.COLUMN_NAME) + ',',
+    @insert += QUOTENAME(c.COLUMN_NAME) + ',',
     
-    @select = @select + 
+    @select += 
     CASE 
-        -- VARCHAR / NVARCHAR
-        WHEN c.DATA_TYPE IN ('varchar','nvarchar','char','nchar') THEN
+        -- STRING
+        WHEN c.DATA_TYPE IN ('varchar','char') THEN
             'LEFT(CONVERT(VARCHAR(MAX), NEWID()), ' + 
-            CAST(ISNULL(c.CHARACTER_MAXIMUM_LENGTH, 10) AS VARCHAR) + ') AS ' + QUOTENAME(c.COLUMN_NAME)
+            CAST(CASE WHEN c.CHARACTER_MAXIMUM_LENGTH = -1 THEN 20 ELSE c.CHARACTER_MAXIMUM_LENGTH END AS VARCHAR) + ')'
+
+        WHEN c.DATA_TYPE IN ('nvarchar','nchar') THEN
+            'LEFT(CONVERT(NVARCHAR(MAX), NEWID()), ' + 
+            CAST(CASE WHEN c.CHARACTER_MAXIMUM_LENGTH = -1 THEN 20 ELSE c.CHARACTER_MAXIMUM_LENGTH END AS VARCHAR) + ')'
 
         -- INT
         WHEN c.DATA_TYPE IN ('int','bigint','smallint','tinyint') THEN
-            'ABS(CHECKSUM(NEWID())) % 1000 AS ' + QUOTENAME(c.COLUMN_NAME)
+            'ABS(CHECKSUM(NEWID())) % 1000'
 
-        -- DECIMAL / NUMERIC
+        -- DECIMAL
         WHEN c.DATA_TYPE IN ('decimal','numeric') THEN
-            'CAST(RAND(CHECKSUM(NEWID())) * 1000 AS DECIMAL(' +
+            'CAST(ABS(CHECKSUM(NEWID())) % 1000 AS DECIMAL(' +
             CAST(c.NUMERIC_PRECISION AS VARCHAR) + ',' +
-            CAST(c.NUMERIC_SCALE AS VARCHAR) + ')) AS ' + QUOTENAME(c.COLUMN_NAME)
+            CAST(c.NUMERIC_SCALE AS VARCHAR) + '))'
 
-        -- DATE / DATETIME
+        -- FLOAT
+        WHEN c.DATA_TYPE IN ('float','real') THEN
+            'RAND(CHECKSUM(NEWID())) * 1000'
+
+        -- DATE
         WHEN c.DATA_TYPE IN ('date','datetime','datetime2') THEN
-            'DATEADD(DAY, -ABS(CHECKSUM(NEWID())) % 365, GETDATE()) AS ' + QUOTENAME(c.COLUMN_NAME)
+            'DATEADD(DAY, -ABS(CHECKSUM(NEWID())) % 365, GETDATE())'
 
-        -- DEFAULT
+        -- BIT
+        WHEN c.DATA_TYPE = 'bit' THEN
+            'ABS(CHECKSUM(NEWID())) % 2'
+
+        -- GUID
+        WHEN c.DATA_TYPE = 'uniqueidentifier' THEN
+            'NEWID()'
+
         ELSE
-            'NULL AS ' + QUOTENAME(c.COLUMN_NAME)
-    END + ','
+            'NULL'
+    END + ' AS ' + QUOTENAME(c.COLUMN_NAME) + ','
 FROM INFORMATION_SCHEMA.COLUMNS c
 WHERE c.TABLE_NAME = @table_name
+AND COLUMNPROPERTY(object_id(c.TABLE_SCHEMA + '.' + c.TABLE_NAME), c.COLUMN_NAME, 'IsIdentity') = 0
 ORDER BY c.ORDINAL_POSITION;
 
 -- hoàn thiện
 SET @insert = LEFT(@insert, LEN(@insert) - 1) + ') ';
 SET @select = LEFT(@select, LEN(@select) - 1) 
-            + ' FROM (SELECT TOP 10 1 AS n FROM sys.objects) t;';
+            + ' FROM (SELECT TOP 10 1 FROM sys.objects) t;';
 
--- in ra câu SQL
 PRINT @insert + @select;
